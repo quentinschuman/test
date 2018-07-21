@@ -1,6 +1,7 @@
 package com.example.demo.action;
 
 import com.example.demo.common.WebUtils;
+import com.example.demo.es.service.EsService;
 import com.example.demo.service.BbsService;
 import com.example.demo.service.BbsUserService;
 import org.beetl.sql.core.SQLManager;
@@ -26,8 +27,8 @@ public class BbsController {
     BbsService bbsService;
     @Autowired
     WebUtils webUtils;
-//    @Autowired
-//    EsService esService;
+    @Autowired
+    EsService esService;
     @Autowired
     private CacheManager cacheManager;
 
@@ -43,4 +44,6 @@ public class BbsController {
     public ModelAndView share(HttpServletRequest request){
         return new ModelAndView("forward:/bbs/topic/module/1-1.html");
     }
+
+
 }
