@@ -1,9 +1,13 @@
 package com.example.demo.config;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.sql.DataSource;
+
 import com.example.demo.common.Const;
 import com.example.demo.dao.BbsModuleDao;
-import com.ibeetl.starter.BeetlTemplateCustomize;
-import com.zaxxer.hikari.HikariDataSource;
+import com.example.demo.util.Functions;
 import org.beetl.core.GroupTemplate;
 import org.beetl.core.resource.ClasspathResourceLoader;
 import org.beetl.ext.spring.BeetlGroupUtilConfiguration;
@@ -16,11 +20,9 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternUtils;
 import org.springframework.web.client.RestTemplate;
-import sun.security.pkcs11.wrapper.Functions;
 
-import javax.sql.DataSource;
-import java.util.HashMap;
-import java.util.Map;
+import com.ibeetl.starter.BeetlTemplateCustomize;
+import com.zaxxer.hikari.HikariDataSource;
 
 @Configuration
 public class BeetlFrameworkConfig   {

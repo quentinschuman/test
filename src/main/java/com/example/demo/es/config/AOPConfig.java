@@ -33,7 +33,7 @@ public class AOPConfig {
 	
 	private Logger logger = LoggerFactory.getLogger(AOPConfig.class);
 	
-	@Pointcut("@annotation(com.ibeetl.bbs.es.annotation.EsIndexType) || @annotation(com.ibeetl.bbs.es.annotation.EsIndexs)")  
+	@Pointcut("@annotation(com.example.demo.es.annotation.EsIndexType) || @annotation(com.example.demo.es.annotation.EsIndexs)")
 	private void anyMethod(){}//定义ES的切入点  
 	
 	@Around("anyMethod()")
