@@ -150,4 +150,10 @@ public class BbsController {
         }
         return view;
     }
+
+    @RequestMapping("/bbs/topic/add.html")
+    public ModelAndView addTopic(ModelAndView view){
+        view.setViewName("/post.html");
+        return view;
+    }
 }
