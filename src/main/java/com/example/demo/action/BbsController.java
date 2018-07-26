@@ -1,14 +1,14 @@
 package com.example.demo.action;
 
+import com.alibaba.fastjson.JSONObject;
 import com.example.demo.common.WebUtils;
 import com.example.demo.es.annotation.EsEntityType;
 import com.example.demo.es.annotation.EsIndexType;
+import com.example.demo.es.annotation.EsIndexs;
 import com.example.demo.es.annotation.EsOperateType;
 import com.example.demo.es.service.EsService;
 import com.example.demo.es.vo.IndexObject;
-import com.example.demo.model.BbsMessage;
-import com.example.demo.model.BbsTopic;
-import com.example.demo.model.BbsUser;
+import com.example.demo.model.*;
 import com.example.demo.service.BbsService;
 import com.example.demo.service.BbsUserService;
 import org.apache.commons.lang3.StringUtils;
@@ -18,14 +18,18 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.RedirectView;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by qianshu on 2018/7/21.
@@ -79,6 +83,16 @@ public class BbsController {
             view.addObject("pagename", keyword);
             view.addObject("resultnum", searcherKeywordPage.getTotalRow());
         }
+        return view;
+    }
+
+    @RequestMapping("/bbs/myMessage.html")
+    public ModelAndView myPage(HttpServletRequest request,HttpServletResponse response){
+        ModelAndView view = new ModelAndView();
+        view.setViewName("/message.html");
+        BbsUser user = webUtils.currentUser(request,response);
+        List<BbsTopic> list = bbsService.getMyTopics(user.getId());
+        view.addObject("list",list);
         return view;
     }
 
@@ -155,5 +169,110 @@ public class BbsController {
     public ModelAndView addTopic(ModelAndView view){
         view.setViewName("/post.html");
         return view;
+    }
+
+    /**
+     * 文章发布改为Ajax方式提交更友好
+     * @param topic
+     * @param post
+     * @param title
+     * @param postContent
+     * @param request
+     * @param response
+     * @return
+     */
+    @ResponseBody
+    @PostMapping("/bbs/topic/save")
+    @EsIndexs({
+            @EsIndexType(entityType = EsEntityType.BbsTopic,operateType = EsOperateType.ADD,key = "tid"),
+            @EsIndexType(entityType = EsEntityType.BbsPost,operateType = EsOperateType.ADD,key = "pid")
+    })
+    public JSONObject saveTopic(BbsTopic topic, BbsPost post,String title,String postContent,HttpServletRequest request,HttpServletResponse response){
+        BbsUser user = webUtils.currentUser(request, response);
+//      Date lastPostTime = bbsService.getLatestPost(user.getId());
+//		long now = System.currentTimeMillis();
+//		long temp = lastPostTime.getTime();
+//		if(now-temp<1000*10){
+//			//10秒之内的提交都不处理
+//			throw new RuntimeException("提交太快，处理不了，上次提交是 "+lastPostTime);
+//		}
+        JSONObject result = new JSONObject();
+        result.put("err",1);
+        if (user == null){
+            result.put("msg", "请先登录后再继续！");
+        }else if (title.length() < 5 || postContent.length() < 10){
+            result.put("msg", "标题或内容太短！");
+        }else {
+            topic.setIsNice(0);
+            topic.setIsUp(0);
+            topic.setPv(1);
+            topic.setPostCount(1);
+            topic.setReplyCount(0);
+            post.setHasReply(0);
+            topic.setContent(title);
+            post.setContent(postContent);
+            bbsService.saveTopic(topic, post, user);
+
+            result.put("err",0);
+            result.put("tid",topic.getId());
+            result.put("pid",post.getId());
+            result.put("msg","/bbs/topic"+topic.getId()+"-1.html");
+        }
+        return result;
+    }
+
+    @ResponseBody
+    @PostMapping("/bbs/post/save")
+    @EsIndexType(entityType = EsEntityType.BbsPost,operateType = EsOperateType.ADD)
+    public JSONObject savePost(BbsPost post,HttpServletRequest request,HttpServletResponse response){
+        JSONObject result = new JSONObject();
+        result.put("err",1);
+        if (post.getContent().length()<5){
+            result.put("msg", "内容太短，请重新编辑！");
+        }else {
+            post.setHasReply(0);
+            post.setCreateTime(new Date());
+            BbsUser user = webUtils.currentUser(request, response);
+            bbsService.savePost(post,user);
+            BbsTopic topic = bbsService.getTopic(post.getTopicId());
+            int totalPost = topic.getPostCount()+1;
+            topic.setPostCount(totalPost);
+            bbsService.updateTopic(topic);
+            bbsService.notifyParticipant(topic.getId(),user.getId());
+            int pageSize = (int)PageQuery.DEFAULT_PAGE_SIZE;
+            int page = (totalPost/pageSize)+(totalPost%pageSize==0?0:1);
+            result.put("msg","/bbs/topic/"+post.getTopicId()+"-"+page+".html");
+            result.put("err",0);
+            result.put("id",post.getId());
+        }
+        return result;
+    }
+
+    @ResponseBody
+    @PostMapping("/bbs/reply/save")
+    @EsIndexType(entityType= EsEntityType.BbsReply ,operateType = EsOperateType.ADD)
+    public JSONObject saveReply(BbsReply reply, HttpServletRequest request, HttpServletResponse response){
+        JSONObject result = new JSONObject();
+        result.put("err", 1);
+        BbsUser user = webUtils.currentUser(request, response);
+        if(user==null){
+            result.put("msg", "未登录用户！");
+        }else if(reply.getContent().length()<2){
+            result.put("msg", "回复内容太短，请修改!");
+        }else{
+            reply.setUserId(user.getId());
+            reply.setPostId(reply.getPostId());
+            reply.setCreateTime(new Date());
+            bbsService.saveReply(reply);
+            reply.set("bbsUser", user);
+            reply.setUser(user);
+            result.put("msg", "评论成功！");
+            result.put("err", 0);
+
+            BbsTopic topic = bbsService.getTopic(reply.getTopicId());
+            bbsService.notifyParticipant(reply.getTopicId(),user.getId());
+            result.put("id",reply.getId());
+        }
+        return result;
     }
 }
